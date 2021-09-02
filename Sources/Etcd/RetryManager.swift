@@ -24,7 +24,7 @@ class RetryManager {
   }
   
   var retryCount = 0
-  func execute<T>(callOptions: CallOptions = CallOptions(), task: @escaping (CallOptions) -> EventLoopFuture<T>) -> EventLoopFuture<T> {
+  func execute<T>(callOptions: CallOptions = CallOptions(), task: @escaping (_ callOptions: CallOptions) -> EventLoopFuture<T>) -> EventLoopFuture<T> {
     var newCallOptions = callOptions
     newCallOptions.customMetadata.replaceOrAdd(name: "token", value: token ?? "")
     let responseFuture = task(newCallOptions)

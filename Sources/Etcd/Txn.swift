@@ -55,8 +55,6 @@ class TxnImp: Txn {
     return self
   }
   
- 
-  
   func commit() -> EventLoopFuture<TxnResponse> {
     let request = TxnRequest.with {
       $0.compare = cmpList.map { $0.toCompare() }
@@ -65,6 +63,4 @@ class TxnImp: Txn {
     }
     return commitColsure(request)
   }
-  
-  
 }
