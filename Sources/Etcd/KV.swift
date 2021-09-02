@@ -23,6 +23,9 @@ public typealias DeleteRangeResponse = Etcdserverpb_DeleteRangeResponse
 public typealias CompactionRequest = Etcdserverpb_CompactionRequest
 public typealias CompactionResponse = Etcdserverpb_CompactionResponse
 
+public typealias TxnRequest = Etcdserverpb_TxnRequest
+public typealias TxnResponse = Etcdserverpb_TxnResponse
+
 public class KV {
   private let client: Etcdserverpb_KVClient
   private let retryManager: RetryManager
@@ -104,6 +107,14 @@ public class KV {
   public func compact(request: CompactionRequest) -> EventLoopFuture<CompactionResponse> {
     self.retryManager.execute { callOptions in
       return self.client.compact(request, callOptions: callOptions).response
+    }
+  }
+  
+  public func txn() -> Txn {
+    return TxnImp { request in
+      return self.retryManager.execute { calloptions in
+        return self.client.txn(request, callOptions: calloptions).response
+      }
     }
   }
 }
