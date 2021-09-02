@@ -58,7 +58,7 @@ public typealias AuthRoleDeleteResponse = Etcdserverpb_AuthRoleDeleteResponse
 public typealias AuthPermissionType = Authpb_Permission.TypeEnum
 
 public class Auth {
-  private let client: Etcdserverpb_AuthClient
+  private let client: AuthClient
   private let retryManager: RetryManager
   
   init(client: Etcdserverpb_AuthClient, retryManager: RetryManager) {
