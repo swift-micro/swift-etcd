@@ -8,6 +8,5 @@
 import Foundation
 
 public enum EtcdError: Error {
-  case dataFormatIsWrong
   case illegalArgument(String?)
 }

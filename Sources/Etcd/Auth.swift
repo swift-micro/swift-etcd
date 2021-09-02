@@ -154,14 +154,10 @@ public class Auth {
     }
   }
   
-  public func roleGrantPermission(role: String, key: String, rangeEnd: String, permissionType: AuthPermissionType) throws -> EventLoopFuture<Etcdserverpb_AuthRoleGrantPermissionResponse> {
-    guard let keyData = key.data(using: .utf8),
-          let rangeEndData = rangeEnd.data(using: .utf8) else {
-            throw EtcdError.dataFormatIsWrong
-          }
+  public func roleGrantPermission(role: String, key: String, rangeEnd: String, permissionType: AuthPermissionType) -> EventLoopFuture<Etcdserverpb_AuthRoleGrantPermissionResponse> {
     let permission = Authpb_Permission.with {
-      $0.key = keyData
-      $0.rangeEnd = rangeEndData
+      $0.key = Data(key.utf8)
+      $0.rangeEnd = Data(rangeEnd.utf8)
       $0.permType = permissionType
     }
     let request = AuthRoleGrantPermissionRequest.with {

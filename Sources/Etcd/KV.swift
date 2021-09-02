@@ -36,13 +36,10 @@ public class KV {
   }
   
   // MARK: - PUT
-  public func put(key: String, value: String) throws -> EventLoopFuture<PutResponse> {
-    guard let keyData = key.data(using: .utf8), let valueData = value.data(using: .utf8) else {
-      throw EtcdError.dataFormatIsWrong
-    }
+  public func put(key: String, value: String) -> EventLoopFuture<PutResponse> {
     let request = PutRequest.with {
-      $0.key = keyData
-      $0.value = valueData
+      $0.key = Data(key.utf8)
+      $0.value = Data(value.utf8)
     }
     return put(request: request)
   }
@@ -55,19 +52,13 @@ public class KV {
   }
   
   // MARK: - GET
-  public func get(key: String) throws -> EventLoopFuture<RangeResponse> {
-    guard let keyData = key.data(using: .utf8) else {
-      throw EtcdError.dataFormatIsWrong
-    }
-    return get(key: keyData)
-  }
-  
-  public func get(key: Data) -> EventLoopFuture<RangeResponse> {
+  public func get(key: String) -> EventLoopFuture<RangeResponse> {
     let request = RangeRequest.with {
-      $0.key = key
+      $0.key = Data(key.utf8)
     }
     return self.get(request: request)
   }
+  
   
   public func get(request: RangeRequest) -> EventLoopFuture<RangeResponse> {
     self.retryManager.execute { callOptions in
@@ -76,16 +67,9 @@ public class KV {
   }
   
   // MARK: - DELETE
-  public func delete(key: String) throws -> EventLoopFuture<DeleteRangeResponse> {
-    guard let keyData = key.data(using: .utf8) else {
-      throw EtcdError.dataFormatIsWrong
-    }
-    return self.delete(key: keyData)
-  }
-  
-  public func delete(key: Data) -> EventLoopFuture<DeleteRangeResponse> {
+  public func delete(key: String) -> EventLoopFuture<DeleteRangeResponse> {
     let request = DeleteRangeRequest.with {
-      $0.key = key
+      $0.key = Data(key.utf8)
     }
     return self.delete(request: request)
   }
