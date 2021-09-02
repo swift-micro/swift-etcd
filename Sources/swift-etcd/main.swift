@@ -1,3 +1,4 @@
+import Foundation
 import GRPC
 import EtcdProto
 import NIO
@@ -25,6 +26,7 @@ defer {
 }
 
 print("================")
+
 
 //let auth = Etcdserverpb_AuthClient(channel: channel)
 //var authenticateRequest = Etcdserverpb_AuthenticateRequest.with {
@@ -78,26 +80,33 @@ print("================")
 
 let auth = EtcdClient.Options.Auth(user: "dev", password: "123")
 let options = EtcdClient.Options(auth: auth)
-let etcdClient = EtcdClient(clientConnetion: channel, etcdClientOptions: options)
+var etcdClient: EtcdClient? = EtcdClient(clientConnetion: channel, etcdClientOptions: options)
+print("mxy----前 \(CFGetRetainCount( etcdClient!.kv))")
+let responseFuture = try etcdClient!.kv.put(key: "/dev/new", value: "new test")
+//etcdClient = nil
 
-let response = try etcdClient.kv.put(key: "/dev/new", value: "new test").wait()
-print(response)
-let eventloop1 = try etcdClient.kv.put(key: "/dev/new", value: "new test").eventLoop
-print("1111111\(eventloop1)")
-let eventloop2 = eventloop1.scheduleTask(in: TimeAmount.seconds(1)) {
-  print("22332323")
-}.futureResult.eventLoop
-print("1111111\(eventloop2)")
+let response = try responseFuture.wait()
+//print("mxy----后 \(CFGetRetainCount( etcdClient!.kv))")
+//print(response)
+//let eventloop1 = try etcdClient.kv.put(key: "/dev/new", value: "new test").eventLoop
+//print("1111111\(eventloop1)")
+//let eventloop2 = eventloop1.scheduleTask(in: TimeAmount.seconds(1)) {
+//  print("22332323")
+//}.futureResult.eventLoop
+//print("1111111\(eventloop2)")
+//
+//let eventloop3 = try etcdClient.kv.put(key: "/dev/new", value: "new test").eventLoop
+//print("11111112\(eventloop3)")
+//let eventloop4 = eventloop1.scheduleTask(in: TimeAmount.seconds(1)) {
+//  print("223323234")
+//}.futureResult.eventLoop
+//print("11111112\(eventloop4)")
+//
+//try etcdClient.kv.put(key: "/dev/new", value: "new test").eventLoop.scheduleTask(in: TimeAmount.seconds(1), {
+//  print("ffffff")
+//}).futureResult.wait()
 
-let eventloop3 = try etcdClient.kv.put(key: "/dev/new", value: "new test").eventLoop
-print("11111112\(eventloop3)")
-let eventloop4 = eventloop1.scheduleTask(in: TimeAmount.seconds(1)) {
-  print("223323234")
-}.futureResult.eventLoop
-print("11111112\(eventloop4)")
 
-try etcdClient.kv.put(key: "/dev/new", value: "new test").eventLoop.scheduleTask(in: TimeAmount.seconds(1), {
-  print("ffffff")
-}).futureResult.wait()
-
-
+let dispatchGroup = DispatchGroup()
+dispatchGroup.enter()
+dispatchGroup.wait()

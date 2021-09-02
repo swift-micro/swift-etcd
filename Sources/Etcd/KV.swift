@@ -12,17 +12,28 @@ import GRPC
 import NIOHPACK
 
 public typealias PutRequest = Etcdserverpb_PutRequest
+public typealias PutResponse = Etcdserverpb_PutResponse
+
+public typealias RangeRequest = Etcdserverpb_RangeRequest
+public typealias RangeResponse = Etcdserverpb_RangeResponse
+
+public typealias DeleteRangeRequest = Etcdserverpb_DeleteRangeRequest
+public typealias DeleteRangeResponse = Etcdserverpb_DeleteRangeResponse
+
+public typealias CompactionRequest = Etcdserverpb_CompactionRequest
+public typealias CompactionResponse = Etcdserverpb_CompactionResponse
+
 public class KV {
-  // mxy remove
-  public var token: String = ""
   private let client: Etcdserverpb_KVClient
   private let retryManager: RetryManager
-  // remove public 
+  
   init(client: Etcdserverpb_KVClient, retryManager: RetryManager) {
     self.client = client
     self.retryManager = retryManager
   }
-  public func put(key: String, value: String) throws -> EventLoopFuture<Etcdserverpb_PutResponse> {
+  
+  // MARK: - PUT
+  public func put(key: String, value: String) throws -> EventLoopFuture<PutResponse> {
     guard let keyData = key.data(using: .utf8), let valueData = value.data(using: .utf8) else {
       throw EtcdError.dataFormatIsWrong
     }
@@ -33,67 +44,67 @@ public class KV {
     return put(request: request)
   }
   
-  public func put(request: PutRequest) -> EventLoopFuture<Etcdserverpb_PutResponse> {
-    let callOptions = CallOptions(customMetadata: HPACKHeaders([("token", "token")]))
+  public func put(request: PutRequest) -> EventLoopFuture<PutResponse> {
+    let callOptions = CallOptions()
     return retryManager.execute(callOptions: callOptions) { callOptions in
-      print("client.put(request, callOptions: callOptions).response")
       return self.client.put(request, callOptions: callOptions).response
     }
-//    return try execute(callOptions: callOptions) { callOptions in
-//      print("client.put(request, callOptions: callOptions).response")
-//      return self.client.put(request, callOptions: callOptions).response
-//    }
   }
   
-  // ========================================================NOT USED =========================================
-  func refreshToken() throws -> EventLoopFuture<String> {
-    let request = Etcdserverpb_PutRequest.with {
-        $0.key = "/dev/name".data(using: .utf8)!
-        $0.value = "xiangyue".data(using: .utf8)!
+  // MARK: - GET
+  public func get(key: String) throws -> EventLoopFuture<RangeResponse> {
+    guard let keyData = key.data(using: .utf8) else {
+      throw EtcdError.dataFormatIsWrong
     }
-    let callOptions = CallOptions(customMetadata: HPACKHeaders([("token", token)]))
-    return self.client.put(request, callOptions: callOptions).response.map { _ in
-      print("==========Auth token result ===========")
-      return self.token
-    }
-//    return try self.put(key: "/dev/auth", value: "auth test")
+    return get(key: keyData)
   }
   
-  var retryCount = 0
-  func execute<T>(callOptions: CallOptions, task: @escaping (CallOptions) -> EventLoopFuture<T>) throws -> EventLoopFuture<T> {
-    let responseFuture = task(callOptions)
-    
-    let eventloop = responseFuture.eventLoop
-    
-    let promise = responseFuture.eventLoop.makePromise(of: T.self)
-    responseFuture.whenComplete { result in
-      switch result {
-      case .success(let response):
-        promise.succeed(response)
-      case .failure(let error):
-        if let error = error as? GRPCStatus, error.code == .unauthenticated {
-          print("erroro===")
-          self.retryCount += 1
-          if self.retryCount % 3 != 0 {
-//            let callOptions = CallOptions(customMetadata: HPACKHeaders([("token", self.token)]))
-//            promise.completeWith(task(callOptions))
-            
-            do {
-              let refrsheTokenFuture: EventLoopFuture<T>  = try self.refreshToken().flatMap { (token: String) in
-                let callOptions = CallOptions(customMetadata: HPACKHeaders([("token", token)]))
-                return task(callOptions)
-              }
-              promise.completeWith(refrsheTokenFuture)
-            } catch {
-              print("new error ==========")
-            }
-            return
-          }
-        }
-        promise.fail(error)
-      }
+  public func get(key: Data) -> EventLoopFuture<RangeResponse> {
+    let request = RangeRequest.with {
+      $0.key = key
     }
-    return promise.futureResult
+    return self.get(request: request)
+  }
+  
+  public func get(request: RangeRequest) -> EventLoopFuture<RangeResponse> {
+    self.retryManager.execute { callOptions in
+      return self.client.range(request, callOptions: callOptions).response
+    }
+  }
+  
+  // MARK: - DELETE
+  public func delete(key: String) throws -> EventLoopFuture<DeleteRangeResponse> {
+    guard let keyData = key.data(using: .utf8) else {
+      throw EtcdError.dataFormatIsWrong
+    }
+    return self.delete(key: keyData)
+  }
+  
+  public func delete(key: Data) -> EventLoopFuture<DeleteRangeResponse> {
+    let request = DeleteRangeRequest.with {
+      $0.key = key
+    }
+    return self.delete(request: request)
+  }
+  
+  public func delete(request: DeleteRangeRequest) -> EventLoopFuture<DeleteRangeResponse> {
+    self.retryManager.execute { callOptions in
+      return self.client.deleteRange(request, callOptions: callOptions).response
+    }
+  }
+  
+  // MARK: - COMPACT
+  public func compact(revision: Int64) -> EventLoopFuture<CompactionResponse> {
+    let request = CompactionRequest.with {
+      $0.revision = revision
+    }
+    return self.compact(request: request)
+  }
+  
+  public func compact(request: CompactionRequest) -> EventLoopFuture<CompactionResponse> {
+    self.retryManager.execute { callOptions in
+      return self.client.compact(request, callOptions: callOptions).response
+    }
   }
 }
 

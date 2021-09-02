@@ -31,15 +31,26 @@ public class EtcdClient {
   private let options: Options
   private let retryManager: RetryManager
   
-  public var kv: KV
+  private var _kv: KV?
+  public var kv: KV {
+    // TODO: need a lock
+    if let _kv = _kv {
+      return _kv
+    }
+    let kvClient = KVClient(channel: clientConnetion)
+    let newKv = KV(client: kvClient, retryManager: retryManager)
+    _kv = newKv
+    return newKv
+  }
   public init(clientConnetion: ClientConnection, etcdClientOptions: EtcdClient.Options) {
     self.clientConnetion = clientConnetion
     self.options = etcdClientOptions
     let authClient = Etcdserverpb_AuthClient(channel: clientConnetion)
     self.retryManager = RetryManager(authClient: authClient, user: options.auth?.user, password: options.auth?.password)
-    
-    let kvClient = KVClient(channel: clientConnetion)
-    self.kv = KV(client: kvClient, retryManager: retryManager)
+  }
+  
+  deinit {
+    print("deinit \(#file)")
   }
 }
 
