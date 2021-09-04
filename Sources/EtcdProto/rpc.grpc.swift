@@ -206,6 +206,11 @@ public protocol Etcdserverpb_WatchClientProtocol: GRPCClient {
   var serviceName: String { get }
   var interceptors: Etcdserverpb_WatchClientInterceptorFactoryProtocol? { get }
 
+  func progress(
+    _ request: Etcdserverpb_WatchProgressRequest,
+    callOptions: CallOptions?
+  ) -> UnaryCall<Etcdserverpb_WatchProgressRequest, Etcdserverpb_WatchResponse>
+
   func watch(
     callOptions: CallOptions?,
     handler: @escaping (Etcdserverpb_WatchResponse) -> Void
@@ -215,6 +220,28 @@ public protocol Etcdserverpb_WatchClientProtocol: GRPCClient {
 extension Etcdserverpb_WatchClientProtocol {
   public var serviceName: String {
     return "etcdserverpb.Watch"
+  }
+
+  /// Progress requests that a watch stream progress status
+  /// be sent in the watch response stream as soon as possible.
+  /// For watch progress responses, the header.revision indicates progress. All future events
+  /// received in this stream are guaranteed to have a higher revision number than the
+  /// header.revision number.
+  ///
+  /// - Parameters:
+  ///   - request: Request to send to Progress.
+  ///   - callOptions: Call options.
+  /// - Returns: A `UnaryCall` with futures for the metadata, status and response.
+  public func progress(
+    _ request: Etcdserverpb_WatchProgressRequest,
+    callOptions: CallOptions? = nil
+  ) -> UnaryCall<Etcdserverpb_WatchProgressRequest, Etcdserverpb_WatchResponse> {
+    return self.makeUnaryCall(
+      path: "/etcdserverpb.Watch/Progress",
+      request: request,
+      callOptions: callOptions ?? self.defaultCallOptions,
+      interceptors: self.interceptors?.makeProgressInterceptors() ?? []
+    )
   }
 
   /// Watch watches for events happening or that have happened. Both input and output
@@ -244,6 +271,9 @@ extension Etcdserverpb_WatchClientProtocol {
 }
 
 public protocol Etcdserverpb_WatchClientInterceptorFactoryProtocol {
+
+  /// - Returns: Interceptors to use when invoking 'progress'.
+  func makeProgressInterceptors() -> [ClientInterceptor<Etcdserverpb_WatchProgressRequest, Etcdserverpb_WatchResponse>]
 
   /// - Returns: Interceptors to use when invoking 'watch'.
   func makeWatchInterceptors() -> [ClientInterceptor<Etcdserverpb_WatchRequest, Etcdserverpb_WatchResponse>]
@@ -295,11 +325,6 @@ public protocol Etcdserverpb_LeaseClientProtocol: GRPCClient {
     _ request: Etcdserverpb_LeaseTimeToLiveRequest,
     callOptions: CallOptions?
   ) -> UnaryCall<Etcdserverpb_LeaseTimeToLiveRequest, Etcdserverpb_LeaseTimeToLiveResponse>
-
-  func leaseLeases(
-    _ request: Etcdserverpb_LeaseLeasesRequest,
-    callOptions: CallOptions?
-  ) -> UnaryCall<Etcdserverpb_LeaseLeasesRequest, Etcdserverpb_LeaseLeasesResponse>
 }
 
 extension Etcdserverpb_LeaseClientProtocol {
@@ -384,24 +409,6 @@ extension Etcdserverpb_LeaseClientProtocol {
       interceptors: self.interceptors?.makeLeaseTimeToLiveInterceptors() ?? []
     )
   }
-
-  /// LeaseLeases lists all existing leases.
-  ///
-  /// - Parameters:
-  ///   - request: Request to send to LeaseLeases.
-  ///   - callOptions: Call options.
-  /// - Returns: A `UnaryCall` with futures for the metadata, status and response.
-  public func leaseLeases(
-    _ request: Etcdserverpb_LeaseLeasesRequest,
-    callOptions: CallOptions? = nil
-  ) -> UnaryCall<Etcdserverpb_LeaseLeasesRequest, Etcdserverpb_LeaseLeasesResponse> {
-    return self.makeUnaryCall(
-      path: "/etcdserverpb.Lease/LeaseLeases",
-      request: request,
-      callOptions: callOptions ?? self.defaultCallOptions,
-      interceptors: self.interceptors?.makeLeaseLeasesInterceptors() ?? []
-    )
-  }
 }
 
 public protocol Etcdserverpb_LeaseClientInterceptorFactoryProtocol {
@@ -417,9 +424,6 @@ public protocol Etcdserverpb_LeaseClientInterceptorFactoryProtocol {
 
   /// - Returns: Interceptors to use when invoking 'leaseTimeToLive'.
   func makeLeaseTimeToLiveInterceptors() -> [ClientInterceptor<Etcdserverpb_LeaseTimeToLiveRequest, Etcdserverpb_LeaseTimeToLiveResponse>]
-
-  /// - Returns: Interceptors to use when invoking 'leaseLeases'.
-  func makeLeaseLeasesInterceptors() -> [ClientInterceptor<Etcdserverpb_LeaseLeasesRequest, Etcdserverpb_LeaseLeasesResponse>]
 }
 
 public final class Etcdserverpb_LeaseClient: Etcdserverpb_LeaseClientProtocol {
@@ -686,7 +690,7 @@ extension Etcdserverpb_MaintenanceClientProtocol {
     )
   }
 
-  /// Hash computes the hash of the KV's backend.
+  /// Hash returns the hash of the local KV state for consistency checking purpose.
   /// This is designed for testing; do not use this in production when there
   /// are ongoing transactions.
   ///
@@ -1379,6 +1383,13 @@ public protocol Etcdserverpb_KVServerInterceptorFactoryProtocol {
 public protocol Etcdserverpb_WatchProvider: CallHandlerProvider {
   var interceptors: Etcdserverpb_WatchServerInterceptorFactoryProtocol? { get }
 
+  /// Progress requests that a watch stream progress status
+  /// be sent in the watch response stream as soon as possible.
+  /// For watch progress responses, the header.revision indicates progress. All future events
+  /// received in this stream are guaranteed to have a higher revision number than the
+  /// header.revision number.
+  func progress(request: Etcdserverpb_WatchProgressRequest, context: StatusOnlyCallContext) -> EventLoopFuture<Etcdserverpb_WatchResponse>
+
   /// Watch watches for events happening or that have happened. Both input and output
   /// are streams; the input stream is for creating and canceling watchers and the output
   /// stream sends events. One watch RPC can watch on multiple key ranges, streaming events
@@ -1397,6 +1408,15 @@ extension Etcdserverpb_WatchProvider {
     context: CallHandlerContext
   ) -> GRPCServerHandlerProtocol? {
     switch name {
+    case "Progress":
+      return UnaryServerHandler(
+        context: context,
+        requestDeserializer: ProtobufDeserializer<Etcdserverpb_WatchProgressRequest>(),
+        responseSerializer: ProtobufSerializer<Etcdserverpb_WatchResponse>(),
+        interceptors: self.interceptors?.makeProgressInterceptors() ?? [],
+        userFunction: self.progress(request:context:)
+      )
+
     case "Watch":
       return BidirectionalStreamingServerHandler(
         context: context,
@@ -1413,6 +1433,10 @@ extension Etcdserverpb_WatchProvider {
 }
 
 public protocol Etcdserverpb_WatchServerInterceptorFactoryProtocol {
+
+  /// - Returns: Interceptors to use when handling 'progress'.
+  ///   Defaults to calling `self.makeInterceptors()`.
+  func makeProgressInterceptors() -> [ServerInterceptor<Etcdserverpb_WatchProgressRequest, Etcdserverpb_WatchResponse>]
 
   /// - Returns: Interceptors to use when handling 'watch'.
   ///   Defaults to calling `self.makeInterceptors()`.
@@ -1436,9 +1460,6 @@ public protocol Etcdserverpb_LeaseProvider: CallHandlerProvider {
 
   /// LeaseTimeToLive retrieves lease information.
   func leaseTimeToLive(request: Etcdserverpb_LeaseTimeToLiveRequest, context: StatusOnlyCallContext) -> EventLoopFuture<Etcdserverpb_LeaseTimeToLiveResponse>
-
-  /// LeaseLeases lists all existing leases.
-  func leaseLeases(request: Etcdserverpb_LeaseLeasesRequest, context: StatusOnlyCallContext) -> EventLoopFuture<Etcdserverpb_LeaseLeasesResponse>
 }
 
 extension Etcdserverpb_LeaseProvider {
@@ -1487,15 +1508,6 @@ extension Etcdserverpb_LeaseProvider {
         userFunction: self.leaseTimeToLive(request:context:)
       )
 
-    case "LeaseLeases":
-      return UnaryServerHandler(
-        context: context,
-        requestDeserializer: ProtobufDeserializer<Etcdserverpb_LeaseLeasesRequest>(),
-        responseSerializer: ProtobufSerializer<Etcdserverpb_LeaseLeasesResponse>(),
-        interceptors: self.interceptors?.makeLeaseLeasesInterceptors() ?? [],
-        userFunction: self.leaseLeases(request:context:)
-      )
-
     default:
       return nil
     }
@@ -1519,10 +1531,6 @@ public protocol Etcdserverpb_LeaseServerInterceptorFactoryProtocol {
   /// - Returns: Interceptors to use when handling 'leaseTimeToLive'.
   ///   Defaults to calling `self.makeInterceptors()`.
   func makeLeaseTimeToLiveInterceptors() -> [ServerInterceptor<Etcdserverpb_LeaseTimeToLiveRequest, Etcdserverpb_LeaseTimeToLiveResponse>]
-
-  /// - Returns: Interceptors to use when handling 'leaseLeases'.
-  ///   Defaults to calling `self.makeInterceptors()`.
-  func makeLeaseLeasesInterceptors() -> [ServerInterceptor<Etcdserverpb_LeaseLeasesRequest, Etcdserverpb_LeaseLeasesResponse>]
 }
 /// To build a server, implement a class that conforms to this protocol.
 public protocol Etcdserverpb_ClusterProvider: CallHandlerProvider {
@@ -1624,7 +1632,7 @@ public protocol Etcdserverpb_MaintenanceProvider: CallHandlerProvider {
   /// Defragment defragments a member's backend database to recover storage space.
   func defragment(request: Etcdserverpb_DefragmentRequest, context: StatusOnlyCallContext) -> EventLoopFuture<Etcdserverpb_DefragmentResponse>
 
-  /// Hash computes the hash of the KV's backend.
+  /// Hash returns the hash of the local KV state for consistency checking purpose.
   /// This is designed for testing; do not use this in production when there
   /// are ongoing transactions.
   func hash(request: Etcdserverpb_HashRequest, context: StatusOnlyCallContext) -> EventLoopFuture<Etcdserverpb_HashResponse>

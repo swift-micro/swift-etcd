@@ -7,6 +7,21 @@
 // For information on using the generated types, please see the documentation:
 //   https://github.com/apple/swift-protobuf/
 
+//
+// Copyright 2016-2021 The jetcd authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 import Foundation
 import SwiftProtobuf
 
@@ -28,9 +43,6 @@ public enum Etcdserverpb_AlarmType: SwiftProtobuf.Enum {
 
   /// space quota is exhausted
   case nospace // = 1
-
-  /// kv store corruption detected
-  case corrupt // = 2
   case UNRECOGNIZED(Int)
 
   public init() {
@@ -41,7 +53,6 @@ public enum Etcdserverpb_AlarmType: SwiftProtobuf.Enum {
     switch rawValue {
     case 0: self = .none
     case 1: self = .nospace
-    case 2: self = .corrupt
     default: self = .UNRECOGNIZED(rawValue)
     }
   }
@@ -50,7 +61,6 @@ public enum Etcdserverpb_AlarmType: SwiftProtobuf.Enum {
     switch self {
     case .none: return 0
     case .nospace: return 1
-    case .corrupt: return 2
     case .UNRECOGNIZED(let i): return i
     }
   }
@@ -64,7 +74,6 @@ extension Etcdserverpb_AlarmType: CaseIterable {
   public static var allCases: [Etcdserverpb_AlarmType] = [
     .none,
     .nospace,
-    .corrupt,
   ]
 }
 
@@ -82,6 +91,9 @@ public struct Etcdserverpb_ResponseHeader {
   public var memberID: UInt64 = 0
 
   /// revision is the key-value store revision when the request was applied.
+  /// For watch progress responses, the header.revision indicates progress. All future events
+  /// recieved in this stream are guaranteed to have a higher revision number than the
+  /// header.revision number.
   public var revision: Int64 = 0
 
   /// raft_term is the raft term when the request was applied.
@@ -613,15 +625,6 @@ public struct Etcdserverpb_Compare {
     set {targetUnion = .value(newValue)}
   }
 
-  /// lease is the lease id of the given key.
-  public var lease: Int64 {
-    get {
-      if case .lease(let v)? = targetUnion {return v}
-      return 0
-    }
-    set {targetUnion = .lease(newValue)}
-  }
-
   /// range_end compares the given target to all keys in the range [key, range_end).
   /// See RangeRequest for more details on key ranges.
   public var rangeEnd: Data = Data()
@@ -637,8 +640,6 @@ public struct Etcdserverpb_Compare {
     case modRevision(Int64)
     /// value is the value of the given key, in bytes.
     case value(Data)
-    /// lease is the lease id of the given key.
-    case lease(Int64)
 
   #if !swift(>=4.1)
     public static func ==(lhs: Etcdserverpb_Compare.OneOf_TargetUnion, rhs: Etcdserverpb_Compare.OneOf_TargetUnion) -> Bool {
@@ -660,10 +661,6 @@ public struct Etcdserverpb_Compare {
       }()
       case (.value, .value): return {
         guard case .value(let l) = lhs, case .value(let r) = rhs else { preconditionFailure() }
-        return l == r
-      }()
-      case (.lease, .lease): return {
-        guard case .lease(let l) = lhs, case .lease(let r) = rhs else { preconditionFailure() }
         return l == r
       }()
       default: return false
@@ -712,7 +709,6 @@ public struct Etcdserverpb_Compare {
     case create // = 1
     case mod // = 2
     case value // = 3
-    case lease // = 4
     case UNRECOGNIZED(Int)
 
     public init() {
@@ -725,7 +721,6 @@ public struct Etcdserverpb_Compare {
       case 1: self = .create
       case 2: self = .mod
       case 3: self = .value
-      case 4: self = .lease
       default: self = .UNRECOGNIZED(rawValue)
       }
     }
@@ -736,7 +731,6 @@ public struct Etcdserverpb_Compare {
       case .create: return 1
       case .mod: return 2
       case .value: return 3
-      case .lease: return 4
       case .UNRECOGNIZED(let i): return i
       }
     }
@@ -765,7 +759,6 @@ extension Etcdserverpb_Compare.CompareTarget: CaseIterable {
     .create,
     .mod,
     .value,
-    .lease,
   ]
 }
 
@@ -888,6 +881,30 @@ public struct Etcdserverpb_HashRequest {
   public init() {}
 }
 
+public struct Etcdserverpb_HashResponse {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var header: Etcdserverpb_ResponseHeader {
+    get {return _header ?? Etcdserverpb_ResponseHeader()}
+    set {_header = newValue}
+  }
+  /// Returns true if `header` has been explicitly set.
+  public var hasHeader: Bool {return self._header != nil}
+  /// Clears the value of `header`. Subsequent reads from it will return its default value.
+  public mutating func clearHeader() {self._header = nil}
+
+  /// hash is the hash value computed from the responding member's key-value store.
+  public var hash: UInt32 = 0
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _header: Etcdserverpb_ResponseHeader? = nil
+}
+
 public struct Etcdserverpb_HashKVRequest {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -920,30 +937,6 @@ public struct Etcdserverpb_HashKVResponse {
 
   /// compact_revision is the compacted revision of key-value store when hash begins.
   public var compactRevision: Int64 = 0
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public init() {}
-
-  fileprivate var _header: Etcdserverpb_ResponseHeader? = nil
-}
-
-public struct Etcdserverpb_HashResponse {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  public var header: Etcdserverpb_ResponseHeader {
-    get {return _header ?? Etcdserverpb_ResponseHeader()}
-    set {_header = newValue}
-  }
-  /// Returns true if `header` has been explicitly set.
-  public var hasHeader: Bool {return self._header != nil}
-  /// Clears the value of `header`. Subsequent reads from it will return its default value.
-  public mutating func clearHeader() {self._header = nil}
-
-  /// hash is the hash value computed from the responding member's KV's backend.
-  public var hash: UInt32 = 0
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -1015,12 +1008,21 @@ public struct Etcdserverpb_WatchRequest {
     set {requestUnion = .cancelRequest(newValue)}
   }
 
+  public var progressRequest: Etcdserverpb_WatchProgressRequest {
+    get {
+      if case .progressRequest(let v)? = requestUnion {return v}
+      return Etcdserverpb_WatchProgressRequest()
+    }
+    set {requestUnion = .progressRequest(newValue)}
+  }
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   /// request_union is a request to either create a new watcher or cancel an existing watcher.
   public enum OneOf_RequestUnion: Equatable {
     case createRequest(Etcdserverpb_WatchCreateRequest)
     case cancelRequest(Etcdserverpb_WatchCancelRequest)
+    case progressRequest(Etcdserverpb_WatchProgressRequest)
 
   #if !swift(>=4.1)
     public static func ==(lhs: Etcdserverpb_WatchRequest.OneOf_RequestUnion, rhs: Etcdserverpb_WatchRequest.OneOf_RequestUnion) -> Bool {
@@ -1034,6 +1036,10 @@ public struct Etcdserverpb_WatchRequest {
       }()
       case (.cancelRequest, .cancelRequest): return {
         guard case .cancelRequest(let l) = lhs, case .cancelRequest(let r) = rhs else { preconditionFailure() }
+        return l == r
+      }()
+      case (.progressRequest, .progressRequest): return {
+        guard case .progressRequest(let l) = lhs, case .progressRequest(let r) = rhs else { preconditionFailure() }
         return l == r
       }()
       default: return false
@@ -1138,6 +1144,18 @@ public struct Etcdserverpb_WatchCancelRequest {
   public init() {}
 }
 
+/// Requests a watch stream progress status be sent in the
+/// watch response stream as soon as possible.
+public struct Etcdserverpb_WatchProgressRequest {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
 public struct Etcdserverpb_WatchResponse {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -1192,7 +1210,7 @@ public struct Etcdserverpb_LeaseGrantRequest {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  /// TTL is the advisory time-to-live in seconds. Expired lease will return -1.
+  /// TTL is the advisory time-to-live in seconds.
   public var ttl: Int64 = 0
 
   /// ID is the requested ID for the lease. If ID is set to 0, the lessor chooses an ID.
@@ -1347,52 +1365,6 @@ public struct Etcdserverpb_LeaseTimeToLiveResponse {
 
   /// Keys is the list of keys attached to this lease.
   public var keys: [Data] = []
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public init() {}
-
-  fileprivate var _header: Etcdserverpb_ResponseHeader? = nil
-}
-
-public struct Etcdserverpb_LeaseLeasesRequest {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public init() {}
-}
-
-public struct Etcdserverpb_LeaseStatus {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  /// TODO: int64 TTL = 2;
-  public var id: Int64 = 0
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public init() {}
-}
-
-public struct Etcdserverpb_LeaseLeasesResponse {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  public var header: Etcdserverpb_ResponseHeader {
-    get {return _header ?? Etcdserverpb_ResponseHeader()}
-    set {_header = newValue}
-  }
-  /// Returns true if `header` has been explicitly set.
-  public var hasHeader: Bool {return self._header != nil}
-  /// Clears the value of `header`. Subsequent reads from it will return its default value.
-  public mutating func clearHeader() {self._header = nil}
-
-  public var leases: [Etcdserverpb_LeaseStatus] = []
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -2371,7 +2343,6 @@ extension Etcdserverpb_AlarmType: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
     0: .same(proto: "NONE"),
     1: .same(proto: "NOSPACE"),
-    2: .same(proto: "CORRUPT"),
   ]
 }
 
@@ -3005,8 +2976,7 @@ extension Etcdserverpb_Compare: SwiftProtobuf.Message, SwiftProtobuf._MessageImp
     5: .standard(proto: "create_revision"),
     6: .standard(proto: "mod_revision"),
     7: .same(proto: "value"),
-    8: .same(proto: "lease"),
-    64: .standard(proto: "range_end"),
+    8: .standard(proto: "range_end"),
   ]
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
@@ -3050,15 +3020,7 @@ extension Etcdserverpb_Compare: SwiftProtobuf.Message, SwiftProtobuf._MessageImp
           self.targetUnion = .value(v)
         }
       }()
-      case 8: try {
-        var v: Int64?
-        try decoder.decodeSingularInt64Field(value: &v)
-        if let v = v {
-          if self.targetUnion != nil {try decoder.handleConflictingOneOf()}
-          self.targetUnion = .lease(v)
-        }
-      }()
-      case 64: try { try decoder.decodeSingularBytesField(value: &self.rangeEnd) }()
+      case 8: try { try decoder.decodeSingularBytesField(value: &self.rangeEnd) }()
       default: break
       }
     }
@@ -3094,14 +3056,10 @@ extension Etcdserverpb_Compare: SwiftProtobuf.Message, SwiftProtobuf._MessageImp
       guard case .value(let v)? = self.targetUnion else { preconditionFailure() }
       try visitor.visitSingularBytesField(value: v, fieldNumber: 7)
     }()
-    case .lease?: try {
-      guard case .lease(let v)? = self.targetUnion else { preconditionFailure() }
-      try visitor.visitSingularInt64Field(value: v, fieldNumber: 8)
-    }()
     case nil: break
     }
     if !self.rangeEnd.isEmpty {
-      try visitor.visitSingularBytesField(value: self.rangeEnd, fieldNumber: 64)
+      try visitor.visitSingularBytesField(value: self.rangeEnd, fieldNumber: 8)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -3132,7 +3090,6 @@ extension Etcdserverpb_Compare.CompareTarget: SwiftProtobuf._ProtoNameProviding 
     1: .same(proto: "CREATE"),
     2: .same(proto: "MOD"),
     3: .same(proto: "VALUE"),
-    4: .same(proto: "LEASE"),
   ]
 }
 
@@ -3313,6 +3270,44 @@ extension Etcdserverpb_HashRequest: SwiftProtobuf.Message, SwiftProtobuf._Messag
   }
 }
 
+extension Etcdserverpb_HashResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".HashResponse"
+  public static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
+    1: .same(proto: "header"),
+    2: .same(proto: "hash"),
+  ]
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularMessageField(value: &self._header) }()
+      case 2: try { try decoder.decodeSingularUInt32Field(value: &self.hash) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if let v = self._header {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
+    }
+    if self.hash != 0 {
+      try visitor.visitSingularUInt32Field(value: self.hash, fieldNumber: 2)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Etcdserverpb_HashResponse, rhs: Etcdserverpb_HashResponse) -> Bool {
+    if lhs._header != rhs._header {return false}
+    if lhs.hash != rhs.hash {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
 extension Etcdserverpb_HashKVRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".HashKVRequest"
   public static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
@@ -3389,44 +3384,6 @@ extension Etcdserverpb_HashKVResponse: SwiftProtobuf.Message, SwiftProtobuf._Mes
   }
 }
 
-extension Etcdserverpb_HashResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".HashResponse"
-  public static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .same(proto: "header"),
-    2: .same(proto: "hash"),
-  ]
-
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularMessageField(value: &self._header) }()
-      case 2: try { try decoder.decodeSingularUInt32Field(value: &self.hash) }()
-      default: break
-      }
-    }
-  }
-
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if let v = self._header {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
-    }
-    if self.hash != 0 {
-      try visitor.visitSingularUInt32Field(value: self.hash, fieldNumber: 2)
-    }
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  public static func ==(lhs: Etcdserverpb_HashResponse, rhs: Etcdserverpb_HashResponse) -> Bool {
-    if lhs._header != rhs._header {return false}
-    if lhs.hash != rhs.hash {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
 extension Etcdserverpb_SnapshotRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".SnapshotRequest"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap()
@@ -3495,6 +3452,7 @@ extension Etcdserverpb_WatchRequest: SwiftProtobuf.Message, SwiftProtobuf._Messa
   public static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
     1: .standard(proto: "create_request"),
     2: .standard(proto: "cancel_request"),
+    3: .standard(proto: "progress_request"),
   ]
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
@@ -3529,6 +3487,19 @@ extension Etcdserverpb_WatchRequest: SwiftProtobuf.Message, SwiftProtobuf._Messa
           self.requestUnion = .cancelRequest(v)
         }
       }()
+      case 3: try {
+        var v: Etcdserverpb_WatchProgressRequest?
+        var hadOneofValue = false
+        if let current = self.requestUnion {
+          hadOneofValue = true
+          if case .progressRequest(let m) = current {v = m}
+        }
+        try decoder.decodeSingularMessageField(value: &v)
+        if let v = v {
+          if hadOneofValue {try decoder.handleConflictingOneOf()}
+          self.requestUnion = .progressRequest(v)
+        }
+      }()
       default: break
       }
     }
@@ -3546,6 +3517,10 @@ extension Etcdserverpb_WatchRequest: SwiftProtobuf.Message, SwiftProtobuf._Messa
     case .cancelRequest?: try {
       guard case .cancelRequest(let v)? = self.requestUnion else { preconditionFailure() }
       try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
+    }()
+    case .progressRequest?: try {
+      guard case .progressRequest(let v)? = self.requestUnion else { preconditionFailure() }
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
     }()
     case nil: break
     }
@@ -3655,6 +3630,25 @@ extension Etcdserverpb_WatchCancelRequest: SwiftProtobuf.Message, SwiftProtobuf.
 
   public static func ==(lhs: Etcdserverpb_WatchCancelRequest, rhs: Etcdserverpb_WatchCancelRequest) -> Bool {
     if lhs.watchID != rhs.watchID {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Etcdserverpb_WatchProgressRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".WatchProgressRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap()
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let _ = try decoder.nextFieldNumber() {
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Etcdserverpb_WatchProgressRequest, rhs: Etcdserverpb_WatchProgressRequest) -> Bool {
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -4045,95 +4039,6 @@ extension Etcdserverpb_LeaseTimeToLiveResponse: SwiftProtobuf.Message, SwiftProt
     if lhs.ttl != rhs.ttl {return false}
     if lhs.grantedTtl != rhs.grantedTtl {return false}
     if lhs.keys != rhs.keys {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
-extension Etcdserverpb_LeaseLeasesRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".LeaseLeasesRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap()
-
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let _ = try decoder.nextFieldNumber() {
-    }
-  }
-
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  public static func ==(lhs: Etcdserverpb_LeaseLeasesRequest, rhs: Etcdserverpb_LeaseLeasesRequest) -> Bool {
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
-extension Etcdserverpb_LeaseStatus: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".LeaseStatus"
-  public static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .same(proto: "ID"),
-  ]
-
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularInt64Field(value: &self.id) }()
-      default: break
-      }
-    }
-  }
-
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if self.id != 0 {
-      try visitor.visitSingularInt64Field(value: self.id, fieldNumber: 1)
-    }
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  public static func ==(lhs: Etcdserverpb_LeaseStatus, rhs: Etcdserverpb_LeaseStatus) -> Bool {
-    if lhs.id != rhs.id {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
-extension Etcdserverpb_LeaseLeasesResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".LeaseLeasesResponse"
-  public static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .same(proto: "header"),
-    2: .same(proto: "leases"),
-  ]
-
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularMessageField(value: &self._header) }()
-      case 2: try { try decoder.decodeRepeatedMessageField(value: &self.leases) }()
-      default: break
-      }
-    }
-  }
-
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if let v = self._header {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
-    }
-    if !self.leases.isEmpty {
-      try visitor.visitRepeatedMessageField(value: self.leases, fieldNumber: 2)
-    }
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  public static func ==(lhs: Etcdserverpb_LeaseLeasesResponse, rhs: Etcdserverpb_LeaseLeasesResponse) -> Bool {
-    if lhs._header != rhs._header {return false}
-    if lhs.leases != rhs.leases {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
