@@ -15,7 +15,6 @@ public enum CmpTarget {
   case create(Int64)
   case mod(Int64)
   case value(Data)
-  case lease(Int64)
   
   public var target: Compare.CompareTarget {
     switch self {
@@ -27,8 +26,6 @@ public enum CmpTarget {
       return .mod
     case .value:
       return .value
-    case .lease:
-      return .lease
     }
   }
   
@@ -42,8 +39,6 @@ public enum CmpTarget {
       return .modRevision(value)
     case .value(let data):
       return .value(data)
-    case .lease(let data):
-      return .lease(data)
     }
   }
 }

@@ -16,7 +16,7 @@ gen-all-proto:
 	--plugin=protoc-gen-swift=./protoc-gen-swift \
 	--plugin=protoc-gen-grpc-swift=./protoc-gen-grpc-swift
 
-downlaod-proto:
+download-proto:
 	curl -o auth.proto https://raw.githubusercontent.com/etcd-io/jetcd/master/jetcd-core/src/main/proto/auth.proto
 	curl -o election.proto https://raw.githubusercontent.com/etcd-io/jetcd/master/jetcd-core/src/main/proto/election.proto
 	curl -o kv.proto https://raw.githubusercontent.com/etcd-io/jetcd/master/jetcd-core/src/main/proto/kv.proto

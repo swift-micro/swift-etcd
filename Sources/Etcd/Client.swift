@@ -8,48 +8,11 @@
 import Foundation
 import GRPC
 import EtcdProto
+import NIOConcurrencyHelpers
 
 typealias KVClient = Etcdserverpb_KVClient
 typealias AuthClient = Etcdserverpb_AuthClient
 
-/// A threading lock based on `libpthread` instead of `libdispatch`.
-///
-/// This object provides a lock on top of a single `pthread_mutex_t`. This kind
-/// of lock is safe to use with `libpthread`-based threading models, such as the
-/// one used by NIO.
-internal final class Lock {
-    private let mutex: UnsafeMutablePointer<pthread_mutex_t> = UnsafeMutablePointer.allocate(capacity: 1)
-
-    /// Create a new lock.
-    public init() {
-        let err = pthread_mutex_init(self.mutex, nil)
-        precondition(err == 0)
-    }
-
-    deinit {
-        let err = pthread_mutex_destroy(self.mutex)
-        precondition(err == 0)
-        self.mutex.deallocate()
-    }
-
-    /// Acquire the lock.
-    ///
-    /// Whenever possible, consider using `withLock` instead of this method and
-    /// `unlock`, to simplify lock handling.
-    public func lock() {
-        let err = pthread_mutex_lock(self.mutex)
-        precondition(err == 0)
-    }
-
-    /// Release the lock.
-    ///
-    /// Whenever possible, consider using `withLock` instead of this method and
-    /// `lock`, to simplify lock handling.
-    public func unlock() {
-        let err = pthread_mutex_unlock(self.mutex)
-        precondition(err == 0)
-    }
-}
 
 // hard to resolve retain cycle problem
 final class MemoizingClientSupplier<T> {

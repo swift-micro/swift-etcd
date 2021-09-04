@@ -31,10 +31,10 @@ class TxnImp: Txn {
 
   func `if`(cmps: Cmp...) throws -> Txn {
     guard seenThen == false else {
-      throw EtcdError.illegalArgument("cannot call If after Then!")
+      throw EtcdError(code: .illegalArgument, message: "cannot call If after Then!")
     }
     guard seenElse == false else {
-      throw EtcdError.illegalArgument("cannot call If after Else!")
+      throw EtcdError(code: .illegalArgument, message: "cannot call If after Else!")
     }
     self.cmpList.append(contentsOf: cmps)
     return self
@@ -42,7 +42,7 @@ class TxnImp: Txn {
   
   func then(ops: Op...) throws -> Txn {
     guard seenElse == false else {
-      throw EtcdError.illegalArgument("cannot call If after Else!")
+      throw EtcdError(code: .illegalArgument, message: "cannot call If after Else!")
     }
     self.seenThen = true
     self.successOpList.append(contentsOf: ops)

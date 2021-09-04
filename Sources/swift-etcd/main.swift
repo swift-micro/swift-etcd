@@ -28,17 +28,17 @@ defer {
 print("================")
 
 
-//let auth = Etcdserverpb_AuthClient(channel: channel)
-//var authenticateRequest = Etcdserverpb_AuthenticateRequest.with {
-//  $0.name = "dev"
-//  $0.password = "123"
-//}
+let auth = Etcdserverpb_AuthClient(channel: channel)
+var authenticateRequest = Etcdserverpb_AuthenticateRequest.with {
+  $0.name = "dev"
+  $0.password = "123"
+}
 //print("================1")
-//let res = try auth.authenticate(authenticateRequest, callOptions: nil).response.wait()
+let res = try auth.authenticate(authenticateRequest, callOptions: nil).response.wait()
 //print("================2 ")
 //print(res)
 //
-//let token = res.token
+let token = res.token
 //let callOptions = CallOptions(customMetadata: HPACKHeaders([("token", "token")]))
 
 // Provide the connection to the generated client.
@@ -78,14 +78,14 @@ print("================")
 
 
 
-let auth = EtcdClient.Options.Auth(user: "dev", password: "123")
-let options = EtcdClient.Options(auth: auth)
-var etcdClient: EtcdClient? = EtcdClient(clientConnetion: channel, etcdClientOptions: options)
-print("mxy----前 \(CFGetRetainCount( etcdClient!.kv))")
-let responseFuture = try etcdClient!.kv.put(key: "/dev/new", value: "new test")
+//let auth = EtcdClient.Options.Auth(user: "dev", password: "123")
+//let options = EtcdClient.Options(auth: auth)
+//var etcdClient: EtcdClient? = EtcdClient(clientConnetion: channel, etcdClientOptions: options)
+//print("mxy----前 \(CFGetRetainCount( etcdClient!.kv))")
+//let responseFuture = try etcdClient!.kv.put(key: "/dev/new", value: "new test")
 //etcdClient = nil
 
-let response = try responseFuture.wait()
+//let response = try responseFuture.wait()
 //print("mxy----后 \(CFGetRetainCount( etcdClient!.kv))")
 //print(response)
 //let eventloop1 = try etcdClient.kv.put(key: "/dev/new", value: "new test").eventLoop
@@ -106,6 +106,8 @@ let response = try responseFuture.wait()
 //  print("ffffff")
 //}).futureResult.wait()
 
+
+testWatch(clientConnection: channel, token: token)
 
 let dispatchGroup = DispatchGroup()
 dispatchGroup.enter()

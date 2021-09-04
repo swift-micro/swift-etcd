@@ -17,16 +17,24 @@ class RetryManager {
   private let password: String?
   private var token: String?
   
+  private(set) var callOptions: CallOptions
+  
   init(authClient: Etcdserverpb_AuthClient, user: String? = nil, password: String? = nil) {
     self.authClient = authClient
     self.user = user
     self.password = password
+    self.callOptions = CallOptions()
   }
   
   var retryCount = 0
-  func execute<T>(callOptions: CallOptions = CallOptions(), task: @escaping (_ callOptions: CallOptions) -> EventLoopFuture<T>) -> EventLoopFuture<T> {
+  func execute<T>(task: @escaping (_ callOptions: CallOptions) -> EventLoopFuture<T>) -> EventLoopFuture<T> {
+    return self.execute(callOptions: self.callOptions, task: task)
+  }
+  
+  func execute<T>(callOptions: CallOptions, task: @escaping (_ callOptions: CallOptions) -> EventLoopFuture<T>) -> EventLoopFuture<T> {
     var newCallOptions = callOptions
     newCallOptions.customMetadata.replaceOrAdd(name: "token", value: token ?? "")
+    self.callOptions = newCallOptions
     let responseFuture = task(newCallOptions)
     let eventloop = responseFuture.eventLoop
     let promise = responseFuture.eventLoop.makePromise(of: T.self)
@@ -42,9 +50,10 @@ class RetryManager {
         if let error = error as? GRPCStatus {
           if error.code == .unauthenticated {
             if let user = strongSelf.user, let password = strongSelf.password {
-              let refreshTokenFutrue: EventLoopFuture<T> = strongSelf.generateToken(eventloop: eventloop, user: user, password: password).flatMap { token in
+              let refreshTokenFutrue: EventLoopFuture<T> = strongSelf.generateToken(user: user, password: password).flatMap { token in
                 strongSelf.token = token
                 newCallOptions.customMetadata.replaceOrAdd(name: "token", value: token)
+                self?.callOptions = newCallOptions
                 return task(newCallOptions)
               }
               promise.completeWith(refreshTokenFutrue)
@@ -61,12 +70,20 @@ class RetryManager {
     return promise.futureResult
   }
   
-  private func generateToken(eventloop: EventLoop, user: String, password: String) -> EventLoopFuture<String> {
+  func generateToken() -> EventLoopFuture<String>? {
+    guard let _user = self.user, let _passwrod = self.password else {
+      return nil
+    }
+    return generateToken(user: _user, password: _passwrod)
+  }
+  
+  func generateToken(user: String, password: String) -> EventLoopFuture<String> {
     let request = Etcdserverpb_AuthenticateRequest.with {
       $0.name = user
       $0.password = password
     }
-    return authClient.authenticate(request, callOptions: nil).response.map { response in
+    return authClient.authenticate(request, callOptions: nil).response.map { [weak self] response in
+      self?.callOptions.customMetadata.replaceOrAdd(name: "token", value: response.token)
       return response.token
     }
   }
