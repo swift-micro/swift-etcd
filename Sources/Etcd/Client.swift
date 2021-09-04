@@ -69,7 +69,7 @@ public class EtcdClient {
     let client = AuthClient(channel: parent.clientConnetion)
     return Auth(client: client, retryManager: parent.retryManager)
   }
-  private var auth: Auth {
+  public var auth: Auth {
     return authClietSupplier.get()
   }
   
@@ -77,7 +77,7 @@ public class EtcdClient {
     let client = KVClient(channel: parent.clientConnetion)
     return KV(client: client, retryManager: parent.retryManager)
   }
-  private var kv: KV {
+  public var kv: KV {
     return kvClietSupplier.get()
   }
   
@@ -85,7 +85,7 @@ public class EtcdClient {
     let client = ClusterClient(channel: parent.clientConnetion)
     return Cluster(client: client, retryManager: parent.retryManager)
   }
-  private var cluster: Cluster {
+  public var cluster: Cluster {
     return clusterClietSupplier.get()
   }
   
@@ -93,7 +93,7 @@ public class EtcdClient {
     let client = MaintenanceClient(channel: parent.clientConnetion)
     return Maintenance(client: client, retryManager: parent.retryManager)
   }
-  private var maintenance: Maintenance {
+  public var maintenance: Maintenance {
     return maintenanceClietSupplier.get()
   }
   
@@ -101,7 +101,7 @@ public class EtcdClient {
     let client = LeaseClient(channel: parent.clientConnetion)
     return Lease(client: client, retryManager: parent.retryManager, eventLoop: parent.clientConnetion.eventLoop)
   }
-  private var lease: Lease {
+  public var lease: Lease {
     return leaseClietSupplier.get()
   }
   
@@ -109,7 +109,7 @@ public class EtcdClient {
     let client = WatchClient(channel: parent.clientConnetion)
     return Watch(client: client, retryManager: parent.retryManager)
   }
-  private var watch: Watch {
+  public var watch: Watch {
     return watchClietSupplier.get()
   }
   
@@ -117,7 +117,7 @@ public class EtcdClient {
     let client = LockClient(channel: parent.clientConnetion)
     return EtcdLock(client: client, retryManager: parent.retryManager)
   }
-  private var lock: EtcdLock {
+  public var lock: EtcdLock {
     return lockClietSupplier.get()
   }
   
@@ -125,7 +125,7 @@ public class EtcdClient {
     let client = ElectionClient(channel: parent.clientConnetion)
     return Election(client: client, retryManager: parent.retryManager)
   }
-  private var election: Election {
+  public var election: Election {
     return electionClietSupplier.get()
   }
   
