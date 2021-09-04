@@ -13,32 +13,8 @@ import NIOConcurrencyHelpers
 typealias KVClient = Etcdserverpb_KVClient
 typealias AuthClient = Etcdserverpb_AuthClient
 
-
-// hard to resolve retain cycle problem
-final class MemoizingClientSupplier<T> {
-  private let delegate: () -> T
-  private let lock = Lock()
-  private var value: T?
-  
-  init(delegate: @escaping () -> T) {
-    self.delegate = delegate
-  }
-  
-  func get() -> T {
-    if let value = value {
-      return value
-    }
-    lock.lock()
-    defer {
-      lock.unlock()
-    }
-    let t = delegate()
-    value = t
-    return t
-  }
-}
-
 public class EtcdClient {
+  // TODO: update options
   public struct Options {
     public struct Auth {
       public var user: String
@@ -58,36 +34,100 @@ public class EtcdClient {
   private let options: Options
   private let retryManager: RetryManager
   
-  // MARK: - KV Property
-  private var _kv: KV?
-  private let _kvLock = Lock()
-  public var kv: KV {
-    if let _kv = _kv {
-      return _kv
-    }
-    _kvLock.lock()
-    defer { _kvLock.unlock() }
-    let kvClient = KVClient(channel: clientConnetion)
-    let newKv = KV(client: kvClient, retryManager: retryManager)
-    _kv = newKv
-    return newKv
+  
+//  // MARK: - KV Property
+//  private var _kv: KV?
+//  private let _kvLock = Lock()
+//  public var kv: KV {
+//    if let _kv = _kv {
+//      return _kv
+//    }
+//    _kvLock.lock()
+//    defer { _kvLock.unlock() }
+//    let kvClient = KVClient(channel: clientConnetion)
+//    let newKv = KV(client: kvClient, retryManager: retryManager)
+//    _kv = newKv
+//    return newKv
+//  }
+//
+//  // MARK: - Auth Property
+//  private var _auth: Auth?
+//  private let _authLock = Lock()
+//  public var auth: Auth {
+//    if let _auth = _auth {
+//      return _auth
+//    }
+//    _authLock.lock()
+//    defer { _authLock.unlock() }
+//    let authClient = AuthClient(channel: clientConnetion)
+//    let newAuth = Auth(client: authClient, retryManager: retryManager)
+//    _auth = newAuth
+//    return newAuth
+//  }
+  
+  private lazy var authClietSupplier: MemoizingClientSupplier<Auth> = MemoizingClientSupplier(parent: self) { parent in
+    let client = AuthClient(channel: parent.clientConnetion)
+    return Auth(client: client, retryManager: parent.retryManager)
+  }
+  private var auth: Auth {
+    return authClietSupplier.get()
   }
   
-  // MARK: - Auth Property
-  private var _auth: Auth?
-  private let _authLock = Lock()
-  public var auth: Auth {
-    if let _auth = _auth {
-      return _auth
-    }
-    _authLock.lock()
-    defer { _authLock.unlock() }
-    let authClient = AuthClient(channel: clientConnetion)
-    let newAuth = Auth(client: authClient, retryManager: retryManager)
-    _auth = newAuth
-    return newAuth
+  private lazy var kvClietSupplier: MemoizingClientSupplier<KV> = MemoizingClientSupplier(parent: self) { parent in
+    let client = KVClient(channel: parent.clientConnetion)
+    return KV(client: client, retryManager: parent.retryManager)
+  }
+  private var kv: KV {
+    return kvClietSupplier.get()
   }
   
+  private lazy var clusterClietSupplier: MemoizingClientSupplier<Cluster> = MemoizingClientSupplier(parent: self) { parent in
+    let client = ClusterClient(channel: parent.clientConnetion)
+    return Cluster(client: client, retryManager: parent.retryManager)
+  }
+  private var cluster: Cluster {
+    return clusterClietSupplier.get()
+  }
+  
+  private lazy var maintenanceClietSupplier: MemoizingClientSupplier<Maintenance> = MemoizingClientSupplier(parent: self) { parent in
+    let client = MaintenanceClient(channel: parent.clientConnetion)
+    return Maintenance(client: client, retryManager: parent.retryManager)
+  }
+  private var maintenance: Maintenance {
+    return maintenanceClietSupplier.get()
+  }
+  
+  private lazy var leaseClietSupplier: MemoizingClientSupplier<Lease> = MemoizingClientSupplier(parent: self) { parent in
+    let client = LeaseClient(channel: parent.clientConnetion)
+    return Lease(client: client, retryManager: parent.retryManager, eventLoop: parent.clientConnetion.eventLoop)
+  }
+  private var lease: Lease {
+    return leaseClietSupplier.get()
+  }
+  
+  private lazy var watchClietSupplier: MemoizingClientSupplier<Watch> = MemoizingClientSupplier(parent: self) { parent in
+    let client = WatchClient(channel: parent.clientConnetion)
+    return Watch(client: client, retryManager: parent.retryManager)
+  }
+  private var watch: Watch {
+    return watchClietSupplier.get()
+  }
+  
+  private lazy var lockClietSupplier: MemoizingClientSupplier<EtcdLock> = MemoizingClientSupplier(parent: self) { parent in
+    let client = LockClient(channel: parent.clientConnetion)
+    return EtcdLock(client: client, retryManager: parent.retryManager)
+  }
+  private var lock: EtcdLock {
+    return lockClietSupplier.get()
+  }
+  
+  private lazy var electionClietSupplier: MemoizingClientSupplier<Election> = MemoizingClientSupplier(parent: self) { parent in
+    let client = ElectionClient(channel: parent.clientConnetion)
+    return Election(client: client, retryManager: parent.retryManager)
+  }
+  private var election: Election {
+    return electionClietSupplier.get()
+  }
   
   // MARK: - Init
   public init(clientConnetion: ClientConnection, etcdClientOptions: EtcdClient.Options) {
@@ -99,4 +139,29 @@ public class EtcdClient {
 }
 
 
+// hard to resolve retain cycle problem
+final private class MemoizingClientSupplier<T> {
+  unowned let parent: EtcdClient
+  private let delegate: (EtcdClient) -> T
+  private var value: T?
+  
+  private let lock = Lock()
 
+  init(parent: EtcdClient, delegate: @escaping (_ parent: EtcdClient) -> T) {
+    self.parent = parent
+    self.delegate = delegate
+  }
+
+  func get() -> T {
+    if let value = value {
+      return value
+    }
+    lock.lock()
+    defer {
+      lock.unlock()
+    }
+    let t = delegate(self.parent)
+    value = t
+    return t
+  }
+}
