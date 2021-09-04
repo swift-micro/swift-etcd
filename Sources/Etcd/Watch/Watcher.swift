@@ -2,7 +2,7 @@
 //  File.swift
 //  File
 //
-//  Created by Xiangyue Meng on 2021/9/3.
+//  Created by xiangyue on 2021/9/4.
 //
 
 import Foundation
@@ -10,16 +10,6 @@ import EtcdProto
 import NIO
 import GRPC
 import NIOConcurrencyHelpers
-
-typealias WatchClient = Etcdserverpb_WatchClient
-
-public typealias WatchRequest = Etcdserverpb_WatchRequest
-public typealias WatchResponse = Etcdserverpb_WatchResponse
-
-public typealias WatchCreateRequest = Etcdserverpb_WatchCreateRequest
-public typealias WatchCancelRequest = Etcdserverpb_WatchCancelRequest
-public typealias WatchProgressRequest = Etcdserverpb_WatchProgressRequest
-
 
 // TODO: close resource for some error, refer to `handleError(EtcdException`
 public class Watcher {
@@ -34,7 +24,7 @@ public class Watcher {
   private var revision: Int64 = 0 // TODO: 重新赋值
   private let isProgressNotify: Bool
   
-  fileprivate var uuid: UUID = UUID()
+  var uuid: UUID = UUID()
   
   private let watchHandlerWrapper: WatchHandlerWrapper
   private let onClose: ((UUID) -> ())?
@@ -149,7 +139,7 @@ public class Watcher {
         revision = modRevision + 1
       }
     }
-    // TODO: 
+    // TODO:
   }
   
   func close() -> EventLoopFuture<Void> {
@@ -185,49 +175,5 @@ extension Watcher {
     init(handler: @escaping (Watcher?, WatchResponse) -> Void) {
       self.handler = handler
     }
-  }
-}
-
-public protocol WatchListener {
-  func onNext(response: WatchResponse)
-  func onError(_ error: EtcdError)
-  func onCompleted()
-}
-
-public class Watch {
-  private let client: WatchClient
-  private let retryManager: RetryManager
-  
-  private var watchers: [Watcher] = []
-  
-  init(client: WatchClient, retryManager: RetryManager) {
-    self.client = client
-    self.retryManager = retryManager
-  }
-  
-  public func watch(request: WatchCreateRequest, listener: WatchListener) -> Watcher {
-    let r = WatchRequest.with {
-      $0.createRequest = request
-    }
-    let watcher = Watcher(client: self.client, request: r, listener: listener, retryManager: retryManager) { [weak self] uuid in
-      // TODO: remove watcher with lock
-      self?.watchers.removeAll { $0.uuid == uuid }
-    }
-    self.watchers.append(watcher)
-    return watcher
-  }
-  
-  public func close() {
-    
-  }
-}
-
-extension WatchResponse {
-  var isProgressNotify: Bool {
-    return events.count == 0
-      && created == false
-      && canceled == false
-      && compactRevision == 0
-    && header.revision != 0
   }
 }
