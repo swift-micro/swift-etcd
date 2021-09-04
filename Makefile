@@ -7,6 +7,8 @@ generate-proto:
 	--swift_out=./Sources/EtcdProto/
 
 gen-all-proto:
+	chmod +x ./protoc-gen-swift
+	chmod +x ./protoc-gen-grpc-swift
 	protoc ./Sources/EtcdProto/*.proto \
 	--proto_path=./Sources/EtcdProto/ \
 	--grpc-swift_opt=Visibility=Public \
