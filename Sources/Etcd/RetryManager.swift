@@ -36,7 +36,6 @@ class RetryManager {
     newCallOptions.customMetadata.replaceOrAdd(name: "token", value: token ?? "")
     self.callOptions = newCallOptions
     let responseFuture = task(newCallOptions)
-    let eventloop = responseFuture.eventLoop
     let promise = responseFuture.eventLoop.makePromise(of: T.self)
     responseFuture.whenComplete { [weak self] result in
       switch result {

@@ -91,7 +91,7 @@ public class EtcdClient {
   
   private lazy var maintenanceClietSupplier: MemoizingClientSupplier<Maintenance> = MemoizingClientSupplier(parent: self) { parent in
     let client = MaintenanceClient(channel: parent.clientConnetion)
-    return Maintenance(client: client, retryManager: parent.retryManager)
+    return Maintenance(client: client, retryManager: parent.retryManager, eventLoop: parent.clientConnetion.eventLoop)
   }
   public var maintenance: Maintenance {
     return maintenanceClietSupplier.get()

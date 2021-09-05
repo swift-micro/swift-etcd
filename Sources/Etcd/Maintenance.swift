@@ -7,6 +7,7 @@
 
 import Foundation
 import NIO
+import NIOConcurrencyHelpers
 import EtcdProto
 
 typealias MaintenanceClient = Etcdserverpb_MaintenanceClient
@@ -26,14 +27,18 @@ public typealias HashKVResponse = Etcdserverpb_HashKVResponse
 public typealias MoveLeaderRequest = Etcdserverpb_MoveLeaderRequest
 public typealias MoveLeaderResponse = Etcdserverpb_MoveLeaderResponse
 
+public typealias SnapshotRequest = Etcdserverpb_SnapshotRequest
+public typealias SnapshotResponse = Etcdserverpb_SnapshotResponse
 
 public class Maintenance {
   private let client: MaintenanceClient
   private let retryManager: RetryManager
+  private let eventLoop: EventLoop
   
-  init(client: MaintenanceClient, retryManager: RetryManager) {
+  init(client: MaintenanceClient, retryManager: RetryManager, eventLoop: EventLoop) {
     self.client = client
     self.retryManager = retryManager
+    self.eventLoop = eventLoop
   }
   
   public func listAlarms() -> EventLoopFuture<AlarmResponse> {
@@ -60,12 +65,18 @@ public class Maintenance {
   
   // TODO: why use new channel
   public func defragmentMember(endpoint: URL) -> EventLoopFuture<DefragmentResponse> {
-    fatalError()
+    let request = DefragmentRequest()
+    return retryManager.execute { callOptions in
+      return self.client.defragment(request, callOptions: callOptions).response
+    }
   }
   
   // TODO: why use new channel
   public func statusMember(endpoint: URL) -> EventLoopFuture<StatusResponse> {
-    fatalError()
+    let request = StatusRequest()
+    return retryManager.execute { callOptions in
+      return self.client.status(request, callOptions: callOptions).response
+    }
   }
   
   public func moveLeader(transfereeID: UInt64) -> EventLoopFuture<MoveLeaderResponse> {
@@ -77,6 +88,7 @@ public class Maintenance {
     }
   }
   
+  // TODO: why use new channel
   public func hashKV(endpoint: UInt64, revision: Int64) -> EventLoopFuture<HashKVResponse> {
     let request = HashKVRequest.with {
       $0.revision = revision
@@ -86,10 +98,45 @@ public class Maintenance {
     }
   }
   
-  // TODO:
-  public func snapshot() {
-    
+  public func snapshot(outputStream: OutputStream) -> EventLoopFuture<Int64> {
+    let request = SnapshotRequest()
+    let promise = eventLoop.makePromise(of: Int64.self)
+    let byteCount = NIOAtomic.makeAtomic(value: 0)
+    let serverStreamingCall = client.snapshot(request, callOptions: retryManager.callOptions) { response in
+      response.blob.withUnsafeBytes { rawBufferPointer in
+        let bufferPointer = rawBufferPointer.bindMemory(to: UInt8.self)
+        outputStream.write(bufferPointer.baseAddress!, maxLength: response.blob.count)
+      }
+      byteCount.add(response.blob.count)
+    }
+    serverStreamingCall.status.whenSuccess { status in
+      if status.code == .ok {
+        promise.succeed(Int64(byteCount.load()))
+      } else {
+        promise.fail(EtcdError.from(grpcStatus: status))
+      }
+    }
+    return promise.futureResult
   }
   
-  
+  public func snapshot<T>(listener: T) where T: EtcdResponseListener, T.ResponseType == SnapshotResponse {
+    let request = SnapshotRequest()
+    let serverStreamingCall = client.snapshot(request, callOptions: retryManager.callOptions) { response in
+      listener.onNext(response: response)
+    }
+    serverStreamingCall.status.whenSuccess { status in
+      if status.code == .ok {
+        listener.onCompleted()
+      } else {
+        listener.onError(EtcdError.from(grpcStatus: status))
+      }
+    }
+  }
+}
+
+public protocol EtcdResponseListener {
+  associatedtype ResponseType
+  func onNext(response: ResponseType)
+  func onError(_ error: EtcdError)
+  func onCompleted()
 }
