@@ -9,6 +9,7 @@ import Foundation
 import EtcdProto
 import NIO
 import GRPC
+import NIOConcurrencyHelpers
 
 
 typealias WatchClient = Etcdserverpb_WatchClient
@@ -30,6 +31,8 @@ public class Watch {
   private let client: WatchClient
   private let retryManager: RetryManager
   
+  private var closed = NIOAtomic.makeAtomic(value: false)
+  private let lock = Lock()
   private var watchers: [Watcher] = []
   
   init(client: WatchClient, retryManager: RetryManager) {
@@ -50,7 +53,25 @@ public class Watch {
   }
   
   public func close() {
-    
+    if closed.compareAndExchange(expected: false, desired: true) {
+      lock.withLockVoid { [weak self] in
+        guard let this = self else { return }
+        for watcher in this.watchers {
+          watcher.close()
+        }
+      }
+    }
+  }
+  
+  public func requestProgress() {
+    if closed.load() == false {
+      lock.withLockVoid { [weak self] in
+        guard let this = self else { return }
+        for watcher in this.watchers {
+          watcher.requestProgress()
+        }
+      }
+    }
   }
 }
 

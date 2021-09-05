@@ -142,16 +142,22 @@ public class Watcher {
     // TODO:
   }
   
-  func close() -> EventLoopFuture<Void> {
+  @discardableResult
+  func close() -> EventLoopFuture<Void>? {
     self.closed.store(true)
-    let request = WatchRequest.with {
-      $0.cancelRequest = WatchCancelRequest()
+    if self.closed.compareAndExchange(expected: false, desired: true) {
+      if watchId != -1 {
+        let request = WatchRequest.with {
+          $0.cancelRequest = WatchCancelRequest()
+        }
+        
+        self.streamingCall.sendMessage(request, promise: nil)
+      }
+      listener.onCompleted()
+      self.onClose?(self.uuid)
+      return self.streamingCall.sendEnd()
     }
-    
-    self.streamingCall.sendMessage(request, promise: nil)
-    listener.onCompleted()
-    self.onClose?(self.uuid)
-    return self.streamingCall.sendEnd()
+    return nil
   }
   
   func requestProgress() {
@@ -159,6 +165,10 @@ public class Watcher {
       $0.progressRequest = Etcdserverpb_WatchProgressRequest()
     }
     streamingCall.sendMessage(request, promise: nil)
+  }
+  
+  deinit {
+    _ = streamingCall.sendEnd()
   }
 }
 

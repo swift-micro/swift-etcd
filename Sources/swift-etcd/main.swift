@@ -34,11 +34,12 @@ var authenticateRequest = Etcdserverpb_AuthenticateRequest.with {
   $0.password = "123"
 }
 //print("================1")
-let res = try auth.authenticate(authenticateRequest, callOptions: nil).response.wait()
+//let res = try auth.authenticate(authenticateRequest, callOptions: nil).response.wait()
 //print("================2 ")
 //print(res)
 //
-let token = res.token
+//let token = res.token
+let token = ""
 //let callOptions = CallOptions(customMetadata: HPACKHeaders([("token", "token")]))
 
 // Provide the connection to the generated client.
@@ -107,7 +108,9 @@ let token = res.token
 //}).futureResult.wait()
 
 
-testWatch(clientConnection: channel, token: token)
+//testWatch(clientConnection: channel, token: token)
+
+try testLease(clientConnection: channel, token: token)
 
 let dispatchGroup = DispatchGroup()
 dispatchGroup.enter()
