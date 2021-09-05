@@ -27,7 +27,8 @@ let package = Package(
             dependencies: [
                 .product(name: "Logging", package: "swift-log"),
                 .product(name: "GRPC", package: "grpc-swift"),
-            ]
+            ],
+            exclude: ["auth.proto", "election.proto", "kv.proto", "lock.proto", "rpc.proto"]
         ),
         .target(
             name: "Etcd",

@@ -41,7 +41,7 @@ final class KVTests: XCTestCase {
   
   
   func testGet() throws {
-    let response = try etcdClient.kv.get(key: "/dev/database")
+    let response = etcdClient.kv.get(key: "/dev/database")
     let value = try response.wait().kvs.first?.value
     XCTAssertNotNil(value)
     XCTAssertEqual(String(data: value!, encoding: .utf8), "xiangyue")
